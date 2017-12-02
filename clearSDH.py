@@ -7,18 +7,19 @@ class ClearSDH:
 
     get_sub_command = "ffmpeg -i '{infile}' -y -map 0:s:0 '{outfile}'"
     replace_sub_command = "ffmpeg -i '{videofilename}' -i '{subfilename}' -y \
-        -map 0:v -map 0:a -map 1:0 -c copy -c:s srt '{outfile}'"
+        -map 0:v -map 0:a -map 1:0 -c copy -c:s {srt_opt} '{outfile}'"
 
     # Remove any match in the following regexes
     # Order is important, as matches are removed as we cycle through them
     regexes = [
         "(\[[^\]\n]*|[^\[\n]*\]) ?",  # indication between square brackets
         "^\W+$",                      # any line with no words
+        "<.*></font>",                    # any empty font tag (for mp4)
     ]
     regexes = [re.compile(r) for r in regexes]
 
     supported_subs = [".srt"]
-    supported_vids = [".mkv"]
+    supported_vids = [".mkv", ".mp4"]
 
     def __init__(self, filenames, debug=False):
         if len(filenames) < 1:
@@ -30,6 +31,15 @@ class ClearSDH:
         else:
             self.subtitles_in = os.path.splitext(self.video_in)[0] + ".srt"
         self.subtitles_out = filenames.get("subtitles_out", self.subtitles_in)
+        
+        if self.video_in:
+            ext = os.path.splitext(self.video_in)[1]
+            if ext == ".mkv":
+                self.srt_opt = "srt"
+            elif ext == ".mp4":
+                self.srt_opt = "mov_text"
+            else:
+                raise ValueError()
 
         self.debug = debug
 
@@ -87,7 +97,8 @@ class ClearSDH:
                 self.replace_sub_command.format(
                     videofilename=self.video_in,
                     subfilename=self.subtitles_out,
-                    outfile=self.video_out))
+                    outfile=self.video_out,
+                    srt_opt=self.srt_opt))
         else:
             name, ext = os.path.splitext(self.video_in)
             tempname = name + "_temp" + ext
@@ -95,7 +106,8 @@ class ClearSDH:
                 self.replace_sub_command.format(
                     videofilename=self.video_in,
                     subfilename=self.subtitles_out,
-                    outfile=tempname))
+                    outfile=tempname,
+                    srt_opt=self.srt_opt))
             os.rename(tempname, self.video_in)
         os.remove(self.subtitles_out)
 
